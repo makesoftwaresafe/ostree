@@ -2877,6 +2877,9 @@ get_remotes_d_dir (OstreeRepo *self, GFile *sysroot)
           break;
         }
     }
+
+  (void)sysroot_owned; // Conditionally owned
+
   /* For backwards compat, also fall back to the sysroot-path variable, which we
    * don't set anymore internally, and I hope no one else uses.
    */
@@ -3297,7 +3300,8 @@ reload_sysroot_config (OstreeRepo *self, GCancellable *cancellable, GError **err
   g_autofree char *bootloader = NULL;
 
   if (!ot_keyfile_get_value_with_default_group_optional (self->config, "sysroot", "bootloader",
-                                                         "auto", &bootloader, error))
+                                                         CFG_SYSROOT_BOOTLOADER_DEFAULT_STR,
+                                                         &bootloader, error))
     return FALSE;
 
   /* TODO: possibly later add support for specifying a generic bootloader
@@ -6087,6 +6091,23 @@ regenerate_metadata (OstreeRepo *self, gboolean do_metadata_commit, GVariant *ad
   if (sign_keys != NULL
       && !_ostree_sign_summary_at (sign, self, summary_tmpdir.fd, sign_keys, cancellable, error))
     return FALSE;
+
+  /* If a signature was made, sync the summary times to it. This way an
+   * HTTP client will consider the files expired at the same time.
+   */
+  if (gpg_key_ids != NULL || sign_keys != NULL)
+    {
+      struct stat stbuf;
+      if (!glnx_fstatat (summary_tmpdir.fd, "summary.sig", &stbuf, AT_SYMLINK_NOFOLLOW, error))
+        return glnx_prefix_error (error, "Unable to get summary.sig status");
+
+      struct timespec ts[2];
+      ts[0] = stbuf.st_atim;
+      ts[1] = stbuf.st_mtim;
+      if (TEMP_FAILURE_RETRY (utimensat (summary_tmpdir.fd, "summary", ts, AT_SYMLINK_NOFOLLOW))
+          != 0)
+        return glnx_throw_errno_prefix (error, "Unable to change summary timestamps");
+    }
 
   /* Rename them into place */
   if (!glnx_renameat (summary_tmpdir.fd, "summary", self->repo_dir_fd, "summary", error))

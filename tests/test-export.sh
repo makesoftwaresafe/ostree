@@ -19,16 +19,12 @@
 
 set -euo pipefail
 
-if ! ostree --version | grep -q -e '- libarchive'; then
-    echo "1..0 #SKIP no libarchive support compiled in"
-    exit 0
-fi
-
 . $(dirname $0)/libtest.sh
 
+skip_without_ostree_feature libarchive
 setup_test_repository "archive"
 
-echo '1..5'
+echo '1..6'
 
 $OSTREE checkout test2 test2-co
 $OSTREE commit --no-xattrs -b test2-noxattrs -s "test2 without xattrs" --tree=dir=test2-co
@@ -81,3 +77,11 @@ assert_file_empty diff.txt
 rm test2.tar diff.txt t -rf
 
 echo 'ok export import'
+
+cd ${test_tmpdir}
+${OSTREE} 'export' test2 -o test2.tar
+tar tvf test2.tar > test2.manifest
+assert_file_has_content test2.manifest 'baz/sub1/duplicate_b link to baz/sub1/duplicate_a'
+assert_file_has_content test2.manifest 'baz/sub2/duplicate_c link to baz/sub1/duplicate_a'
+
+echo 'ok export hard links'
