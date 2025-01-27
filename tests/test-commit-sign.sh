@@ -21,14 +21,16 @@ set -euo pipefail
 
 . $(dirname $0)/libtest.sh
 
-if ! has_gpgme; then
-    echo "1..0 #SKIP no gpg support compiled in"
+skip_without_ostree_feature gpgme
+
+if test -z "${OSTREE_HTTPD}"; then
+    echo "1..0 #SKIP no ostree-trivial-httpd"
     exit 0
 fi
 
 echo "1..7"
 
-keyid="472CDAFA"
+keyid="7FCA23D8472CDAFA"
 oldpwd=`pwd`
 mkdir ostree-srv
 cd ostree-srv

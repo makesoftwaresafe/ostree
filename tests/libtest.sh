@@ -25,11 +25,12 @@ else
   test_srcdir=$(dirname $0)
 fi
 
-if [ -n "${G_TEST_BUILDDIR:-}" ]; then
-  test_builddir="${G_TEST_BUILDDIR}/tests"
-else
-  test_builddir=$(dirname $0)
+top_builddir="${G_TEST_BUILDDIR:-}"
+if test -z "${top_builddir}"; then
+    top_builddir=$(cd $(dirname $0)/.. && pwd)
 fi
+
+test_builddir="${top_builddir}/tests"
 . ${test_srcdir}/libtest-core.sh
 
 # Make sure /sbin/capsh etc. are in our PATH even if non-root
@@ -180,9 +181,11 @@ if test -n "${OT_TESTS_VALGRIND:-}"; then
     CMD_PREFIX="env G_SLICE=always-malloc OSTREE_SUPPRESS_SYNCFS=1 valgrind -q --error-exitcode=1 --leak-check=full --num-callers=30 --suppressions=${test_srcdir}/glib.supp --suppressions=${test_srcdir}/ostree.supp"
 fi
 
-OSTREE_HTTPD="${G_TEST_BUILDDIR}/ostree-trivial-httpd"
-if ! [ -x "${OSTREE_HTTPD}" ]; then
-    fatal "Failed to find ${OSTREE_HTTPD}"
+if test -z "${OSTREE_HTTPD:-}"; then
+    OSTREE_HTTPD="${top_builddir}/ostree-trivial-httpd"
+    if ! [ -x "${OSTREE_HTTPD}" ]; then
+        OSTREE_HTTPD=
+    fi
 fi
 
 files_are_hardlinked() {
@@ -245,6 +248,13 @@ setup_test_repository () {
     ln -s nonexistent baz/alink
     mkdir baz/another/
     echo x > baz/another/y
+
+    mkdir baz/sub1
+    echo SAME_CONTENT > baz/sub1/duplicate_a
+    echo SAME_CONTENT > baz/sub1/duplicate_b
+
+    mkdir baz/sub2
+    echo SAME_CONTENT > baz/sub2/duplicate_c
 
     # if we are running inside a container we cannot test
     # the overlayfs whiteout marker passthrough
@@ -686,18 +696,20 @@ skip_without_fuse () {
     [ -e /etc/mtab ] || skip "no /etc/mtab"
 }
 
-has_gpgme () {
-    local ret
+has_ostree_feature () {
+    local ret=0
+    # Note that this needs to write to a file and then grep the file, to
+    # avoid ostree --version being killed with SIGPIPE and exiting with a
+    # nonzero status under `set -o pipefail`.
     ${CMD_PREFIX} ostree --version > version.txt
-    grep -q -e '- gpgme' version.txt
-    ret=$?
+    grep -q -e "- $1\$" version.txt || ret=$?
     rm -f version.txt
     return ${ret}
 }
 
-skip_without_gpgme() {
-    if ! has_gpgme; then
-        skip "no gpg support compiled in"
+skip_without_ostree_feature () {
+    if ! has_ostree_feature "$1"; then
+        skip "no $1 support compiled in"
     fi
 }
 
@@ -739,21 +751,6 @@ libtest_cleanup_gpg () {
     gpg-connect-agent --homedir "${gpg_homedir}" killagent /bye || true
 }
 libtest_exit_cmds+=(libtest_cleanup_gpg)
-
-has_sign_ed25519 () {
-    local ret
-    ${CMD_PREFIX} ostree --version > version.txt
-    grep -q -e '- sign-ed25519' version.txt
-    ret=$?
-    rm -f version.txt
-    return ${ret}
-}
-
-skip_without_sign_ed25519() {
-    if ! has_sign_ed25519; then
-        skip "no ed25519 support compiled in"
-    fi
-}
 
 # Keys for ed25519 signing tests
 ED25519PUBLIC=
