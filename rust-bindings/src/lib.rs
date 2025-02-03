@@ -1,6 +1,6 @@
 //! # Rust bindings for **libostree**
 //!
-//! [libostree](https://ostree.readthedocs.io) is both a shared library and suite of command line
+//! [libostree](https://ostreedev.github.io/ostree/) is both a shared library and suite of command line
 //! tools that combines a "git-like" model for committing and downloading bootable filesystem trees,
 //! along with a layer for deploying them and managing the bootloader configuration.
 
@@ -12,8 +12,6 @@
 // Re-export our dependencies.  See https://gtk-rs.org/blog/2021/06/22/new-release.html
 // "Dependencies are re-exported".  Users will need e.g. `gio::File`, so this avoids
 // them needing to update matching versions.
-#[cfg(feature = "cap-std-apis")]
-pub use cap_std;
 pub use ffi;
 pub use gio;
 pub use glib;
@@ -58,6 +56,7 @@ mod object_name;
 pub use crate::object_name::*;
 mod object_details;
 pub use crate::object_details::*;
+mod deployment;
 mod repo;
 pub use crate::repo::*;
 #[cfg(any(feature = "v2016_8", feature = "dox"))]
