@@ -687,8 +687,6 @@ ostree_repo_auto_lock_cleanup (OstreeRepoAutoLock *auto_lock)
 /**
  * _ostree_repo_auto_transaction_new:
  * @repo: (not nullable): an #OsreeRepo object
- * @cancellable: Cancellable
- * @error: a #GError
  *
  * Return a guard for a transaction in @repo.
  *
